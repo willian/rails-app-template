@@ -1,0 +1,59 @@
+version: '3'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ./bin/boot
+    tty: true
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    volumes:
+      - .:/app
+      - cache-volume:/cache
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    networks:
+      - public
+    env_file:
+      - development.env
+    depends_on:
+      - db
+      - redis
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    tty: true
+    volumes:
+      - .:/app
+      - cache-volume:/cache
+    networks:
+      - public
+    env_file:
+      - development.env
+    environment:
+      RAILS_ENV: test
+    depends_on:
+      - db
+      - redis
+  db:
+    image: postgres:alpine
+    networks:
+      - public
+    volumes:
+      - db-data-volume:/var/lib/postgresql
+  redis:
+    image: redis:alpine
+    networks:
+      - public
+volumes:
+  cache-volume:
+    driver: local
+  db-data-volume:
+    driver: local
+networks:
+  public:
+    driver: bridge

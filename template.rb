@@ -1,6 +1,8 @@
 RAILS_51 = !!(Rails.version.match(/5\.1.*/))
 RAW_REPO_URL = 'https://raw.githubusercontent.com/willian/rails-app-template/master'
 
+# GEMS
+
 gsub_file 'Gemfile', /^gem\s\'tzinfo\-data.*$/i, ''
 gsub_file 'Gemfile', /^\#\sUse\sCoffeeScript.*/, ''
 gsub_file 'Gemfile', /^gem\s\'coffee\-.*$/i, ''
@@ -38,6 +40,8 @@ end
 
 run 'bundle'
 
+# GENERATORS
+
 application <<-GENERATORS
 
     config.generators do |g|
@@ -51,6 +55,8 @@ application <<-GENERATORS
     end
 GENERATORS
 
+# LOCALES
+
 remove_file 'config/locales/en.yml'
 
 %w[en-US pt-BR].map do |locale|
@@ -60,6 +66,8 @@ remove_file 'config/locales/en.yml'
   )
 end
 
+# 404 ERROR CATCHER
+
 gsub_file 'app/controllers/application_controller.rb', /^\s\sprotect_from_forgery\swith\:\s\:exception$/i, <<-CONTROLLER
   protect_from_forgery with: :exception
 
@@ -68,14 +76,21 @@ gsub_file 'app/controllers/application_controller.rb', /^\s\sprotect_from_forger
   # end
 CONTROLLER
 
+# WEBPACK & REACT
+
 remove_file 'bin/yarn' if RAILS_51
 run 'bin/rails webpacker:install'
 run 'bin/rails webpacker:install:react'
 
-gsub_file 'package.json', /^\s\s\s\s\"coffee\-.*\,$/, ''
 gsub_file 'app/assets/javascripts/application.js', /JavaScript\/Coffee/, 'JavaScript'
+gsub_file 'config/webpack/paths.yml', /^\s\s\s\s\-\s\.coffee$/, ''
+gsub_file 'package.json', /^\s\s\s\s\"coffee\-.*\,$/, ''
+remove_file 'config/webpack/loaders/coffee.js'
 
 run 'yarn'
+
+# NPM DEPENDENCIES
+
 npm_packages = %w[
   axios
   babel-polyfill
@@ -103,7 +118,9 @@ npm_dev_packages = %w[
 ]
 run "yarn add #{npm_packages.join(' ')}"
 run "yarn add -D #{npm_dev_packages.join(' ')}"
-run 'yarn add '
+
+# NPM SCRIPTS
+
 gsub_file 'package.json', /^\s\s\"dependencies\"\:\s\{$/, <<-NPM_SCRIPTS
   "scripts": {
     "lint": "standard frontend/**/*",
@@ -113,6 +130,8 @@ gsub_file 'package.json', /^\s\s\"dependencies\"\:\s\{$/, <<-NPM_SCRIPTS
   },
   "dependencies": {
 NPM_SCRIPTS
+
+# LINTER & JEST
 
 gsub_file 'package.json', /^\s\s\}\n\}$/, <<-NPM_CONFIG
   },
@@ -161,8 +180,7 @@ gsub_file 'package.json', /^\s\s\}\n\}$/, <<-NPM_CONFIG
 }
 NPM_CONFIG
 
-gsub_file 'config/webpack/paths.yml', /^\s\s\s\s\-\s\.coffee$/, ''
-remove_file 'config/webpack/loaders/coffee.js'
+# FRONTEND CONFIGURATION
 
 gsub_file 'config/webpack/configuration.js', /\$\{devServer\.host\}/, '${env.APP_HOST || devServer.host}'
 gsub_file 'config/webpack/development.server.yml', 'localhost', '0.0.0.0'
@@ -190,4 +208,19 @@ get "#{RAW_REPO_URL}/defaults/frontend/specs/app.spec.jsx", 'frontend/specs/app.
 get "#{RAW_REPO_URL}/defaults/frontend/specs/e2e/app.spec.js", 'frontend/specs/e2e/app.spec.js'
 get "#{RAW_REPO_URL}/defaults/frontend/specs/helpers/visit.js", 'frontend/specs/helpers/visit.js'
 
+# RSPEC
+
 generate 'rspec:install'
+
+# DOCKER
+if yes?('Would you like to use Docker?')
+  get "#{RAW_REPO_URL}/defaults/docker/boot", 'bin/boot'
+  get "#{RAW_REPO_URL}/defaults/docker/development.env", './development.env'
+  get "#{RAW_REPO_URL}/defaults/docker/docker-compose.yml", './docker-compose.yml'
+  get "#{RAW_REPO_URL}/defaults/docker/Dockerfile", './Dockerfile'
+  log <<-DOCKER_LOG
+  Docker files have been copied to your application.
+  Please, edit Dockerfile and config/database.yml files and update {APP_NAME}
+  to your app's name.
+  DOCKER_LOG
+end
