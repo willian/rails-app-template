@@ -214,10 +214,12 @@ generate 'rspec:install'
 
 # DOCKER
 if yes?('Would you like to use Docker?')
+  remove_file 'config/database.yml'
   get "#{RAW_REPO_URL}/defaults/docker/boot", 'bin/boot'
   get "#{RAW_REPO_URL}/defaults/docker/development.env", './development.env'
   get "#{RAW_REPO_URL}/defaults/docker/docker-compose.yml", './docker-compose.yml'
   get "#{RAW_REPO_URL}/defaults/docker/Dockerfile", './Dockerfile'
+  get "#{RAW_REPO_URL}/defaults/docker/database.yml", 'config/database.yml'
   log <<-DOCKER_LOG
   Docker files have been copied to your application.
   Please, edit Dockerfile and config/database.yml files and update {APP_NAME}
