@@ -1,4 +1,3 @@
-RAILS_51 = !!(Rails.version.match(/5\.1.*/))
 RAW_REPO_URL = 'https://raw.githubusercontent.com/willian/rails-app-template/master'
 
 # GEMS
@@ -8,20 +7,16 @@ gsub_file 'Gemfile', /^\#\sUse\sCoffeeScript.*/, ''
 gsub_file 'Gemfile', /^gem\s\'coffee\-.*$/i, ''
 gsub_file 'Gemfile', /^group\s:.*end$/m, ''
 
-gem 'webpacker', github: 'rails/webpacker'
-
 gem 'active_model_serializers', '~> 0.10'
 gem 'bcrypt', '~> 3.1'
 gem 'deterministic', '~> 0.16'
 gem 'pg', '~> 0.18'
 gem 'poltergeist', '~> 1.13'
 gem 'redis', '~> 3.0'
-gem 'vanilla-ujs', '~> 1.3' unless RAILS_51
-gem 'webpacker-react', '~> 0.2'
 
 gem_group :development, :test do
   gem 'byebug', platform: :mri
-  gem 'capybara', '~> 2.7'
+  gem 'capybara', '~> 2.14'
   gem 'rspec-rails'
   gem 'factory_girl_rails'
 end
@@ -38,7 +33,8 @@ gem_group :test do
   gem 'shoulda-matchers'
 end
 
-run 'bundle'
+run 'bundle install'
+run 'git add . && git ci -m "FIRST"'
 
 # GENERATORS
 
@@ -78,16 +74,14 @@ CONTROLLER
 
 # WEBPACK & REACT
 
-remove_file 'bin/yarn' if RAILS_51
-run 'bin/rails webpacker:install'
-run 'bin/rails webpacker:install:react'
+gem 'react_on_rails', '8.0.3'
+run 'bundle install'
+run 'git add . && git ci -m "Add ReactOnRails gem"'
 
-gsub_file 'app/assets/javascripts/application.js', /JavaScript\/Coffee/, 'JavaScript'
-gsub_file 'config/webpack/paths.yml', /^\s\s\s\s\-\s\.coffee$/, ''
-gsub_file 'package.json', /^\s\s\s\s\"coffee\-.*\,$/, ''
-remove_file 'config/webpack/loaders/coffee.js'
+generate 'react_on_rails:install'
+run 'bundle install && yarn install'
 
-run 'yarn'
+run 'git add . && git ci -m "Install ReactOnRails dependencies"'
 
 # NPM DEPENDENCIES
 
@@ -106,14 +100,19 @@ npm_dev_packages = %w[
   enzyme
   eslint
   eslint-config-standard
+  eslint-config-standard-jsx
   eslint-config-standard-react
   eslint-plugin-promise
   eslint-plugin-react
   eslint-plugin-standard
   jest
+  jest-enzyme
   nightmare
+  npm-run-all
   react-addons-test-utils
   react-dev-utils
+  rimraf
+  snazzy
   standard
 ]
 run "yarn add #{npm_packages.join(' ')}"
@@ -123,10 +122,10 @@ run "yarn add -D #{npm_dev_packages.join(' ')}"
 
 gsub_file 'package.json', /^\s\s\"dependencies\"\:\s\{$/, <<-NPM_SCRIPTS
   "scripts": {
-    "lint": "standard frontend/**/*",
-    "server": "./bin/webpack-dev-server",
-    "test": "node frontend/scripts/test.js --env=jsdom",
-    "watch": "./bin/webpack-watcher"
+    "dev:rm": "rimraf public/webpack/development/*",
+    "dev:build": "cd client && bundle exec rake react_on_rails:locale && yarn run build:development",
+    "dev:server": "npm-run-all -p dev:rm dev:build",
+    "lint": "standard client/**/*"
   },
   "dependencies": {
 NPM_SCRIPTS
@@ -138,12 +137,13 @@ gsub_file 'package.json', /^\s\s\}\n\}$/, <<-NPM_CONFIG
   "standard": {
     "parser": "babel-eslint",
     "ignore": [
-      "app/assets/config/manifest.js",
-      "app/assets/javascripts/application.js",
-      "app/assets/javascripts/cable.js",
-      "config/webpack/**/*"
+      "node_modules/",
+      "src/index.html"
     ],
-    "globals": [],
+    "globals": [
+      "process",
+      "webpackIsomorphicTools"
+    ],
     "plugins": [
       "react",
       "promise"
@@ -151,24 +151,24 @@ gsub_file 'package.json', /^\s\s\}\n\}$/, <<-NPM_CONFIG
   },
   "jest": {
     "collectCoverageFrom": [
-      "<rootDir>/frontend/bundles/**/*.{js,jsx}",
-      "<rootDir>/frontend/src/**/*.{js,jsx}"
+      "<rootDir>/client/bundles/**/*.{js,jsx}",
+      "<rootDir>/client/src/**/*.{js,jsx}"
     ],
     "setupFiles": [
-      "<rootDir>/frontend/config/polyfills.js"
+      "<rootDir>/client/config/polyfills.js"
     ],
     "testPathIgnorePatterns": [
       "<rootDir>/node_modules/",
       "<rootDir>/config/webpack/",
       "<rootDir>/(vendor)/",
-      "<rootDir>/frontend/(build|docs|node_modules|scripts|vendor)/"
+      "<rootDir>/client/(build|docs|node_modules|scripts|vendor)/"
     ],
     "testEnvironment": "node",
     "testURL": "http://localhost",
     "transform": {
       "^.+\\\\\\\\.(js|jsx)$": "<rootDir>/node_modules/babel-jest",
-      "^.+\\\\\\\\.css$": "<rootDir>/frontend/config/jest/cssTransform.js",
-      "^(?!.*\\\\\\\\.(js|jsx|css|json)$)": "<rootDir>/frontend/config/jest/fileTransform.js"
+      "^.+\\\\\\\\.css$": "<rootDir>/client/config/jest/cssTransform.js",
+      "^(?!.*\\\\\\\\.(js|jsx|css|json)$)": "<rootDir>/client/config/jest/fileTransform.js"
     },
     "transformIgnorePatterns": [
       "/node_modules/.+\\\\\\\\.(js|jsx)$"
@@ -180,33 +180,7 @@ gsub_file 'package.json', /^\s\s\}\n\}$/, <<-NPM_CONFIG
 }
 NPM_CONFIG
 
-# FRONTEND CONFIGURATION
-
-gsub_file 'config/webpack/configuration.js', /\$\{devServer\.host\}/, '${env.APP_HOST || devServer.host}'
-gsub_file 'config/webpack/development.server.yml', 'localhost', '0.0.0.0'
-gsub_file 'config/webpack/paths.yml', 'entry: packs', 'entry: entries'
-gsub_file 'config/webpack/paths.yml', 'source: app/javascript', 'source: frontend'
-
-gsub_file '.babelrc', /^\s\s\s\s\"react\"$/, <<-BABEL
-    "es2015",
-    "react"
-BABEL
-
-run 'rm -rf app/javascript'
-run 'mkdir -p frontend/config/jest'
-run 'mkdir -p frontend/entries/components'
-run 'mkdir -p frontend/scripts'
-run 'mkdir -p frontend/specs/e2e'
-run 'mkdir -p frontend/specs/helpers'
-
-get "#{RAW_REPO_URL}/defaults/frontend/config/jest/cssTransform.js", 'frontend/config/jest/cssTransform.js'
-get "#{RAW_REPO_URL}/defaults/frontend/config/jest/fileTransform.js", 'frontend/config/jest/fileTransform.js'
-get "#{RAW_REPO_URL}/defaults/frontend/config/polyfills.js", 'frontend/config/polyfills.js'
-get "#{RAW_REPO_URL}/defaults/frontend/entries/application.js", 'frontend/entries/application.js'
-get "#{RAW_REPO_URL}/defaults/frontend/scripts/test.js", 'frontend/scripts/test.js'
-get "#{RAW_REPO_URL}/defaults/frontend/specs/app.spec.jsx", 'frontend/specs/app.spec.jsx'
-get "#{RAW_REPO_URL}/defaults/frontend/specs/e2e/app.spec.js", 'frontend/specs/e2e/app.spec.js'
-get "#{RAW_REPO_URL}/defaults/frontend/specs/helpers/visit.js", 'frontend/specs/helpers/visit.js'
+run 'git add . && git ci -m "Install NPM dependencies"'
 
 # RSPEC
 
@@ -227,3 +201,5 @@ if yes?('Would you like to use Docker?')
   to your app's name.
   DOCKER_LOG
 end
+
+run 'git add . && git ci -m "Configure RSpec"'
